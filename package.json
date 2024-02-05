@@ -1,0 +1,29 @@
+{
+	"name": "personal-cli-builder",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"type": "module",
+	"scripts": {
+		"start": "node dist/index.cjs",
+		"start:dev": "tsx watch ./index.ts",
+		"build": "tsup index.ts --out-dir dist",
+		"build:watch": "tsup index.ts --out-dir dist --watch"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"@types/fs-extra": "^11.0.4",
+		"@types/node": "^20.11.13",
+		"tsup": "^8.0.1",
+		"tsx": "^4.7.0",
+		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"@clack/prompts": "^0.7.0",
+		"commander": "^11.1.0",
+		"fs-extra": "^11.2.0",
+		"ora": "^8.0.1"
+	}
+}
