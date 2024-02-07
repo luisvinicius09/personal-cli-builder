@@ -1,62 +1,149 @@
 import * as p from '@clack/prompts';
 import { Command } from 'commander';
-import { copy, emptyDir, pathExists, pathExistsSync, readdir } from 'fs-extra';
+import fse from 'fs-extra';
 import ora from 'ora';
+import Conf from 'conf';
+
+const s = p.spinner();
+
+function ensure<T>(
+	argument: T | undefined | null,
+	message: string = 'This value was promised to be there.'
+): T {
+	if (argument === undefined || argument === null) {
+		throw new TypeError(message);
+	}
+
+	return argument;
+}
+
+const config = new Conf<{
+	builds: { [key: string]: { projectDirectory: string; destinationDirectory: string } };
+}>({
+	projectName: 'personal-cli-builder',
+	schema: {
+		builds: {
+			type: 'object',
+			patternProperties: {
+				'^.*$': {
+					type: 'object',
+					properties: {
+						projectDirectory: {
+							type: 'string',
+						},
+						destinationDirectory: {
+							type: 'string',
+						},
+					},
+				},
+			},
+		},
+	},
+});
 
 async function main() {
 	console.clear();
 
+	let projectDirectory: string;
+	let destinationDirectory: string;
+
 	try {
 		p.intro('personal-cli-builder');
 
-		const { projectDirectory, destinationDirectory } = await p.group(
-			{
-				projectDirectory: () => {
-					return p.text({
-						message: 'Project directory',
-						placeholder: '/home/user/...',
-						validate: (value) => {
-							if (value.length === 0) {
-								return 'Path is required';
-							}
+		const shouldUsePreviousDirectories = await p.confirm({
+			message: 'Should use previous directories?',
+		});
 
-							const doesPathExist = pathExistsSync(value);
+		if (shouldUsePreviousDirectories) {
+			const storedBuilds = config.get('builds');
+			const storedDirs = Object.keys(storedBuilds).map((key) => {
+				return { id: key, ...storedBuilds[key] };
+			});
 
-							if (!doesPathExist) {
-								return 'Path does not exist';
-							}
+			const chosenDirId = await p.select({
+				message: 'Select previous directories',
+				options: storedDirs.map((directory) => {
+					return {
+						value: directory.id,
+						label: `Project Dir: ${directory.projectDirectory} | Destination Dir: ${directory.destinationDirectory}`,
+					};
+				}),
+			});
 
-							return undefined;
-						},
-					});
+			const chosenDir = ensure(storedDirs.find((dir) => dir.id === chosenDirId));
+
+			projectDirectory = chosenDir.projectDirectory;
+			destinationDirectory = chosenDir.destinationDirectory;
+		} else {
+			const directory = await p.group(
+				{
+					projectDirectory: () => {
+						return p.text({
+							message: 'Project directory',
+							placeholder: '/home/luis/...',
+							validate: (value) => {
+								if (value.length === 0) {
+									return 'Path is required';
+								}
+
+								const doesPathExist = fse.pathExistsSync(value);
+
+								if (!doesPathExist) {
+									return 'Path does not exist';
+								}
+
+								return undefined;
+							},
+						});
+					},
+					destinationDirectory: () => {
+						return p.text({
+							message: 'Destination directory',
+							placeholder: '/mnt/c/Users/Luis/...',
+							validate: (value) => {
+								if (value.length === 0) {
+									return 'Path is required';
+								}
+
+								const doesPathExist = fse.pathExistsSync(value);
+
+								if (!doesPathExist) {
+									return 'Path does not exist';
+								}
+
+								return undefined;
+							},
+						});
+					},
 				},
-				destinationDirectory: () => {
-					return p.text({
-						message: 'Destination directory',
-						placeholder: '/home/user/...',
-						validate: (value) => {
-							if (value.length === 0) {
-								return 'Path is required';
-							}
+				{
+					onCancel: () => {
+						p.cancel('Operation cancelled.');
+						process.exit(1);
+					},
+				}
+			);
 
-							const doesPathExist = pathExistsSync(value);
+			projectDirectory = directory.projectDirectory;
+			destinationDirectory = directory.destinationDirectory;
+		}
 
-							if (!doesPathExist) {
-								return 'Path does not exist';
-							}
+		if (!shouldUsePreviousDirectories) {
+			const shouldSaveDirectories = await p.confirm({
+				message: 'Do you want to save these directories for future use?',
+			});
 
-							return undefined;
-						},
-					});
-				},
-			},
-			{
-				onCancel: () => {
-					p.cancel('Operation cancelled.');
-					process.exit(1);
-				},
+			if (shouldSaveDirectories) {
+				const buildName = await p.text({
+					message: 'Build name',
+				});
+
+				config.set(`builds.${buildName as string}`, {
+					projectDirectory,
+					destinationDirectory,
+				});
 			}
-		);
+		}
 
 		const shouldShowExtraOptions = await p.confirm({ message: 'Should show extra options?' });
 
@@ -66,7 +153,7 @@ async function main() {
 			});
 
 			if (shouldExcludeFiles) {
-				const projectDirList = await readdir(projectDirectory);
+				const projectDirList = await fse.readdir(projectDirectory);
 
 				const filesToExclude = await p.multiselect({
 					message: 'Select files to exclude',
@@ -78,6 +165,8 @@ async function main() {
 					}),
 				});
 
+				// const excludesFiles = filesToExclude
+
 				// TODO: create filter to copy files
 			}
 
@@ -87,11 +176,13 @@ async function main() {
 			});
 
 			if (shouldClearDestinationFolder) {
-				await emptyDir(destinationDirectory);
+				await fse.emptyDir(destinationDirectory);
 			}
 		}
 
-		await copy(projectDirectory, destinationDirectory);
+		s.start('Copying files');
+		await fse.copy(projectDirectory, destinationDirectory);
+		s.stop('Files copied');
 
 		// TODO: Improvement -> run builds before copying files
 
