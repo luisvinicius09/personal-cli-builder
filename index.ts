@@ -46,6 +46,7 @@ async function main() {
 
 	let projectDirectory: string;
 	let destinationDirectory: string;
+	let filesToExclude: string[] = [];
 
 	try {
 		p.intro('personal-cli-builder');
@@ -155,19 +156,21 @@ async function main() {
 			if (shouldExcludeFiles) {
 				const projectDirList = await fse.readdir(projectDirectory);
 
-				const filesToExclude = await p.multiselect({
+				const excludedFiles = await p.multiselect({
 					message: 'Select files to exclude',
-					options: projectDirList.map((filePath) => {
+					options: projectDirList.map((file) => {
 						return {
-							value: filePath,
-							label: filePath,
+							value: `${
+								projectDirectory.charAt(projectDirectory.length - 1) === '/'
+									? projectDirectory
+									: projectDirectory + '/'
+							}${file}`,
+							label: file,
 						};
 					}),
 				});
 
-				// const excludesFiles = filesToExclude
-
-				// TODO: create filter to copy files
+				filesToExclude = excludedFiles as string[];
 			}
 
 			const shouldClearDestinationFolder = await p.confirm({
@@ -181,7 +184,15 @@ async function main() {
 		}
 
 		s.start('Copying files');
-		await fse.copy(projectDirectory, destinationDirectory);
+		if (filesToExclude.length > 0) {
+			await fse.copy(projectDirectory, destinationDirectory, {
+				filter: (src, dest) => {
+					return !filesToExclude.includes(src);
+				},
+			});
+		} else {
+			await fse.copy(projectDirectory, destinationDirectory);
+		}
 		s.stop('Files copied');
 
 		// TODO: Improvement -> run builds before copying files
