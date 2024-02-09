@@ -23,6 +23,12 @@ var config = new Conf({
             },
             destinationDirectory: {
               type: "string"
+            },
+            filesToExclude: {
+              type: "array",
+              items: {
+                type: "string"
+              }
             }
           }
         }
@@ -35,28 +41,33 @@ async function main() {
   let projectDirectory;
   let destinationDirectory;
   let filesToExclude = [];
+  let filePathsToExclude = [];
   try {
     p.intro("personal-cli-builder");
-    const shouldUsePreviousDirectories = await p.confirm({
-      message: "Should use previous directories?"
+    const usePrevDirs = await p.confirm({
+      message: "Do you want to use any of saved directories?"
     });
-    if (shouldUsePreviousDirectories) {
+    if (usePrevDirs) {
       const storedBuilds = config.get("builds");
       const storedDirs = Object.keys(storedBuilds).map((key) => {
         return { id: key, ...storedBuilds[key] };
       });
       const chosenDirId = await p.select({
-        message: "Select previous directories",
+        message: "Select saved directories",
         options: storedDirs.map((directory) => {
           return {
             value: directory.id,
-            label: `Project Dir: ${directory.projectDirectory} | Destination Dir: ${directory.destinationDirectory}`
+            label: `${directory.id}- Project Dir: ${directory.projectDirectory} | Destination Dir: ${directory.destinationDirectory}`
           };
         })
       });
       const chosenDir = ensure(storedDirs.find((dir) => dir.id === chosenDirId));
       projectDirectory = chosenDir.projectDirectory;
       destinationDirectory = chosenDir.destinationDirectory;
+      filesToExclude = chosenDir.filesToExclude;
+      filePathsToExclude = chosenDir.filesToExclude.map(
+        (file) => `${projectDirectory.charAt(projectDirectory.length - 1) === "/" ? projectDirectory : projectDirectory + "/"}${file}`
+      );
     } else {
       const directory = await p.group(
         {
@@ -103,20 +114,6 @@ async function main() {
       projectDirectory = directory.projectDirectory;
       destinationDirectory = directory.destinationDirectory;
     }
-    if (!shouldUsePreviousDirectories) {
-      const shouldSaveDirectories = await p.confirm({
-        message: "Do you want to save these directories for future use?"
-      });
-      if (shouldSaveDirectories) {
-        const buildName = await p.text({
-          message: "Build name"
-        });
-        config.set(`builds.${buildName}`, {
-          projectDirectory,
-          destinationDirectory
-        });
-      }
-    }
     const shouldShowExtraOptions = await p.confirm({ message: "Should show extra options?" });
     if (shouldShowExtraOptions) {
       const shouldExcludeFiles = await p.confirm({
@@ -128,12 +125,15 @@ async function main() {
           message: "Select files to exclude",
           options: projectDirList.map((file) => {
             return {
-              value: `${projectDirectory.charAt(projectDirectory.length - 1) === "/" ? projectDirectory : projectDirectory + "/"}${file}`,
+              value: file,
               label: file
             };
           })
         });
         filesToExclude = excludedFiles;
+        filePathsToExclude = excludedFiles.map(
+          (file) => `${projectDirectory.charAt(projectDirectory.length - 1) === "/" ? projectDirectory : projectDirectory + "/"}${file}`
+        );
       }
       const shouldClearDestinationFolder = await p.confirm({
         message: "Do you want to clear the destination folder before copying files?",
@@ -143,12 +143,26 @@ async function main() {
         await fse.emptyDir(destinationDirectory);
       }
     }
+    if (!usePrevDirs) {
+      const saveDirs = await p.confirm({
+        message: "Do you want to save these directories for future use?"
+      });
+      if (saveDirs) {
+        const buildName = await p.text({
+          message: "Build name"
+        });
+        config.set(`builds.${buildName}`, {
+          projectDirectory,
+          destinationDirectory,
+          filesToExclude
+        });
+      }
+    }
     s.start("Copying files");
-    if (filesToExclude.length > 0) {
+    if (filePathsToExclude.length > 0) {
       await fse.copy(projectDirectory, destinationDirectory, {
         filter: (src, dest) => {
-          console.log(src);
-          return !filesToExclude.includes(src);
+          return !filePathsToExclude.includes(src);
         }
       });
     } else {
