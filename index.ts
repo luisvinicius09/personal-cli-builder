@@ -1,7 +1,7 @@
 import { emitKeypressEvents } from 'readline';
 import resetConsole from './helpers/resetConsole.js';
 import cli from './cli.js';
-import menu from './helpers/menu.js';
+import printMenu from './helpers/printMenu.js';
 
 type PressedKey = {
 	sequence: string;
@@ -13,7 +13,7 @@ type PressedKey = {
 
 async function main() {
 	console.clear();
-	menu();
+	printMenu();
 
 	emitKeypressEvents(process.stdin);
 

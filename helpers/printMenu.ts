@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 
-export default function menu() {
+export default function printMenu() {
 	console.log(chalk.red('Menu!'));
 
 	console.log(`Press ${chalk.bgBlue.white('m')} to go back to menu`);
