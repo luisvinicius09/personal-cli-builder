@@ -1,4 +1,23 @@
 // index.ts
+import { emitKeypressEvents } from "readline";
+
+// helpers/menu.ts
+import chalk from "chalk";
+function menu() {
+  console.log(chalk.red("Menu!"));
+  console.log(`Press ${chalk.bgBlue.white("m")} to go back to menu`);
+  console.log(`Press ${chalk.bgYellow.white("a")} to run action/build`);
+  console.log(`Press ${chalk.bgRed.white("q")} to quit`);
+}
+
+// helpers/resetConsole.ts
+function resetConsole() {
+  console.clear();
+  process.stdin.resume();
+  menu();
+}
+
+// cli.ts
 import * as p from "@clack/prompts";
 import fse from "fs-extra";
 import Conf from "conf";
@@ -36,8 +55,7 @@ var config = new Conf({
     }
   }
 });
-async function main() {
-  console.clear();
+async function cli() {
   let projectDirectory;
   let destinationDirectory;
   let filesToExclude = [];
@@ -174,5 +192,36 @@ async function main() {
     console.error(err);
     throw err;
   }
+}
+
+// index.ts
+async function main() {
+  console.clear();
+  menu();
+  emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY)
+    process.stdin.setRawMode(true);
+  process.stdin.on("keypress", async (_, _key) => {
+    const key = _key;
+    if (key.ctrl && key.name === "c" || key.name === "q")
+      process.exit();
+    if (key.name === "m") {
+      process.stdin.pause();
+      console.log("got to menu");
+      await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          resolve("foo");
+        }, 2e3);
+      });
+      resetConsole();
+    }
+    if (key.name === "a") {
+      console.clear();
+      process.stdin.pause();
+      cli().then(() => {
+        resetConsole();
+      });
+    }
+  });
 }
 main();
