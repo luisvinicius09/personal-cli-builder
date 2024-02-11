@@ -2,6 +2,7 @@ import { emitKeypressEvents } from 'readline';
 import resetConsole from './helpers/resetConsole.js';
 import cli from './cli.js';
 import printMenu from './helpers/printMenu.js';
+import { Command } from 'commander';
 
 type PressedKey = {
 	sequence: string;
@@ -12,6 +13,10 @@ type PressedKey = {
 };
 
 async function main() {
+	let latestBuildId: string | null = 'null';
+
+	const program = new Command().name('pcb').description('A simple CLI for building projects');
+
 	console.clear();
 	printMenu();
 
@@ -23,6 +28,8 @@ async function main() {
 		const key = _key as PressedKey;
 
 		if ((key.ctrl && key.name === 'c') || key.name === 'q') process.exit();
+
+		console.log(key);
 
 		if (key.name === 'm') {
 			process.stdin.pause();
@@ -49,15 +56,22 @@ async function main() {
 			});
 		}
 
-		// if (key.name === 'r') {
-		// 	console.clear();
-		// 	process.stdin.pause();
+		if (key.name === 'r') {
+			console.clear();
+			process.stdin.pause();
 
-		// 	// TODO: Re run build/action
-		// 	cli().then(() => {
-		// 		resetConsole();
-		// 	});
-		// }
+			// TODO: Re run build/action
+			if (latestBuildId === null) {
+				console.log('No build to re-run');
+
+				resetConsole();
+				return;
+			}
+
+			console.log('building');
+
+			resetConsole();
+		}
 	});
 }
 

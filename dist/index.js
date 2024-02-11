@@ -1,20 +1,21 @@
 // index.ts
 import { emitKeypressEvents } from "readline";
 
-// helpers/menu.ts
+// helpers/printMenu.ts
 import chalk from "chalk";
-function menu() {
+function printMenu({ latestBuildId }) {
   console.log(chalk.red("Menu!"));
   console.log(`Press ${chalk.bgBlue.white("m")} to go back to menu`);
   console.log(`Press ${chalk.bgYellow.white("a")} to run action/build`);
+  console.log(`Press ${chalk.bgMagenta.white("r")} to re-run action/build - Latest: ${latestBuildId}`);
   console.log(`Press ${chalk.bgRed.white("q")} to quit`);
 }
 
 // helpers/resetConsole.ts
-function resetConsole() {
+function resetConsole({ latestBuildId }) {
   console.clear();
   process.stdin.resume();
-  menu();
+  printMenu({ latestBuildId });
 }
 
 // cli.ts
@@ -56,6 +57,7 @@ var config = new Conf({
   }
 });
 async function cli() {
+  let latestBuildId = null;
   let projectDirectory;
   let destinationDirectory;
   let filesToExclude = [];
@@ -80,6 +82,7 @@ async function cli() {
         })
       });
       const chosenDir = ensure(storedDirs.find((dir) => dir.id === chosenDirId));
+      latestBuildId = chosenDir.id;
       projectDirectory = chosenDir.projectDirectory;
       destinationDirectory = chosenDir.destinationDirectory;
       filesToExclude = chosenDir.filesToExclude;
@@ -169,6 +172,7 @@ async function cli() {
         const buildName = await p.text({
           message: "Build name"
         });
+        latestBuildId = buildName;
         config.set(`builds.${buildName}`, {
           projectDirectory,
           destinationDirectory,
@@ -188,6 +192,7 @@ async function cli() {
     }
     s.stop("Files copied");
     p.outro(`Done!`);
+    return { latestBuildId };
   } catch (err) {
     console.error(err);
     throw err;
@@ -195,9 +200,12 @@ async function cli() {
 }
 
 // index.ts
+import { Command } from "commander";
 async function main() {
+  let latestBuildId = null;
+  const program = new Command().name("pcb").description("A simple CLI for building projects");
   console.clear();
-  menu();
+  printMenu({ latestBuildId });
   emitKeypressEvents(process.stdin);
   if (process.stdin.isTTY)
     process.stdin.setRawMode(true);
@@ -205,6 +213,7 @@ async function main() {
     const key = _key;
     if (key.ctrl && key.name === "c" || key.name === "q")
       process.exit();
+    console.log(key);
     if (key.name === "m") {
       process.stdin.pause();
       console.log("got to menu");
@@ -213,14 +222,25 @@ async function main() {
           resolve("foo");
         }, 2e3);
       });
-      resetConsole();
+      resetConsole({ latestBuildId });
     }
     if (key.name === "a") {
       console.clear();
       process.stdin.pause();
       cli().then(() => {
-        resetConsole();
+        resetConsole({ latestBuildId });
       });
+    }
+    if (key.name === "r") {
+      console.clear();
+      process.stdin.pause();
+      if (latestBuildId === null) {
+        console.log("No build to re-run");
+        resetConsole({ latestBuildId });
+        return;
+      }
+      console.log("building");
+      resetConsole({ latestBuildId });
     }
   });
 }
