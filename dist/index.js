@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 // src/TerminalInterface.ts
 import chalk from "chalk";
 import { emitKeypressEvents } from "readline";

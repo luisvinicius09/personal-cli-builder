@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 import { PressedKey } from './shared/types.ts';
 import { TerminalInterface } from './TerminalInterface.ts';
 
